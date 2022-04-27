@@ -8,6 +8,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (Dec; yes; no)
 
 record Packet (Node Msg : Set) : Set where
+  constructor _⇒_⦂_
   field
     src : Node
     dst : Node
@@ -31,12 +32,12 @@ module _ (app : App) where
 
   Event = Node × (Input ⊎ Output)
   Trace = List Event
-  LocalState = (n : Node) → State n
+  NodeStates = (n : Node) → State n
   Packets = List (Packet Node Msg)
 
-  World = Packets × LocalState × Trace
+  World = Packets × NodeStates × Trace
 
-  _[_↦_] : LocalState → (n : Node) → State n → LocalState
+  _[_↦_] : NodeStates → (n : Node) → State n → NodeStates
   _[_↦_] S n s n′ with n ≟ n′
   ... | yes refl = s
   ... | no  _    = S n′

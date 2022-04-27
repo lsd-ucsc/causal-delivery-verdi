@@ -1,6 +1,6 @@
 open import Data.Nat as ℕ
 
-module CausalTracking (n : ℕ) (RawMsg : Set) where
+module DependencyTracking (n : ℕ) (RawMsg : Set) where
 
 open import Data.Fin as Fin
 open import Data.Product
@@ -28,33 +28,35 @@ record Msg : Set where
 data Input : Set where
   send : (dst : Node) → (raw : RawMsg) → Input
 
+data Output : Set where
+  deliver : RawMsg → Output
+
 record Process : Set where
   field
     id : Node
     deps : Deps
     msgCt : ℕ
 
-handleInput : Node → Process → Input → Process × ⊤ × List (Packet Node Msg)
-handleInput src p (send dst raw) = p′ , tt , pkt ∷ []
+handleInput : Node → Process → Input → Process × Output × List (Packet Node Msg)
+handleInput src p (send dst raw) = p′ , deliver raw ,  [ src ⇒ dst ⦂ msg ]
   where
     msgid = record { pid = Process.id p ; ct = Process.msgCt p }
     msg = record { id = msgid ; deps = Process.deps p ; raw = raw }
-    pkt = record { src = src ; dst = dst ; msg = msg }
     p′ = record p { deps = msgid ∷ (Process.deps p) ; msgCt = (Process.msgCt p) ℕ.+ 1}
 
-handleMsg : Node → Process → Packet Node Msg → Process × ⊤ × List (Packet Node Msg)
-handleMsg dst p record { msg = record { deps = deps }  } = p′ , tt , []
+handleMsg : Node → Process → Packet Node Msg → Process × Output × List (Packet Node Msg)
+handleMsg dst p (_ ⇒ _ ⦂ record { raw = raw ; deps = deps }) = p′ , deliver raw , []
   where
     p′ = record p { deps = deps ++ Process.deps p }
 
-causalTrack : App
-causalTrack = record
+DependencyTracking : App
+DependencyTracking = record
                 { Node = Node
                 ; _≟_ = Fin._≟_
                 ; State = λ _ → Process
                 ; Msg = Msg
                 ; Input = Input
-                ; Output = ⊤
+                ; Output = Output
                 ; initState = λ id → record { id = id ; deps = [] ; msgCt = 0 }
                 ; HandleInp = handleInput
                 ; HandleMsg = handleMsg
