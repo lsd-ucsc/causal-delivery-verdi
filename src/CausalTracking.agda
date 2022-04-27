@@ -42,6 +42,11 @@ handleInput src p (send dst raw) = p′ , tt , pkt ∷ []
     pkt = record { src = src ; dst = dst ; msg = msg }
     p′ = record p { deps = msgid ∷ (Process.deps p) ; msgCt = (Process.msgCt p) ℕ.+ 1}
 
+handleMsg : Node → Process → Packet Node Msg → Process × ⊤ × List (Packet Node Msg)
+handleMsg dst p record { msg = record { deps = deps }  } = p′ , tt , []
+  where
+    p′ = record p { deps = deps ++ Process.deps p }
+
 causalTrack : App
 causalTrack = record
                 { Node = Node
@@ -52,5 +57,5 @@ causalTrack = record
                 ; Output = ⊤
                 ; initState = λ id → record { id = id ; deps = [] ; msgCt = 0 }
                 ; HandleInp = handleInput
-                ; HandleMsg = {!!}
+                ; HandleMsg = handleMsg
                 }
