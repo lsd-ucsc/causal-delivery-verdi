@@ -2,11 +2,12 @@ open import Data.Nat as ℕ
 
 module DependencyChecking (n : ℕ) (RawMsg : Set) where
 
+open import Function hiding (id)
 open import Data.Maybe
 open import Data.Bool
 open import Data.Fin as Fin
 open import Data.Product
-open import Data.List as List
+open import Data.List as List hiding (null)
 open import Data.List.Relation.Binary.Subset.Propositional using (_⊆_)
 open import Data.Unit
 open import Relation.Nullary using (Dec; yes; no)
@@ -31,10 +32,11 @@ record Msg : Set where
 
 data Input : Set where
   send : (dst : Node) → (raw : RawMsg) → Input
+  deliver : Input
 
 data Output : Set where
-  deliver : List RawMsg → Output -- sometimes we deliver 0 message
-                                 -- messages in the list are ordered by their dependencies
+  deliver : RawMsg → Output
+  null    : Output
 
 record Process : Set where
   field
@@ -43,35 +45,35 @@ record Process : Set where
     msgCt : ℕ
     dq : List Msg
 
-handleInput : Node → Process → Input → Process × Output × List (Packet Node Msg)
-handleInput src p (send dst raw) = p′ , deliver [ raw ] ,  [ src ⇒ dst ⦂ msg ]
-  where
-    msgid = record { pid = Process.id p ; ct = Process.msgCt p }
-    msg = record { id = msgid ; deps = Process.deps p ; raw = raw }
-    p′ = record p { deps = msgid ∷ (Process.deps p) ; msgCt = (Process.msgCt p) ℕ.+ 1}
-
 -- deliverable : (p : Process) → (m : Msg) → Dec (Msg.deps m ⊆ Process.deps p)
 _==_ : MsgId → MsgId → Bool
 deliverable : Process → Msg → Bool
 deliverable p m = all (λ d → any (d ==_ ) (Process.deps p)) (Msg.deps m)
 
--- NOTE: Agda termination checker doesn't recoginize record update syntax
--- NOTE: This function may not return all deliverable messages, so needs to be called repeatedly until it returens an empty list
-processDq : Process → Process × List Msg
-processDq p@record { id = id ; deps = deps ; msgCt = msgCt ; dq = [] } = p , []
-processDq p@record { id = id ; deps = deps ; msgCt = msgCt ; dq = (x ∷ xs) }
-  = let p′ , msgs =  processDq record { id = id ; deps = deps ; msgCt = msgCt ; dq = xs } in
-    if   deliverable p x
-    then record p′ { deps = Msg.deps x ++ Process.deps p′} , x ∷ msgs
-    else record p′ { dq = x ∷ Process.dq p′ } , msgs
+handleInput : Node → Process → Input → Process × Output × List (Packet Node Msg)
+handleInput src p (send dst raw) = p′ , deliver raw ,  [ src ⇒ dst ⦂ msg ]
+  where
+    msgid = record { pid = Process.id p ; ct = Process.msgCt p }
+    msg = record { id = msgid ; deps = Process.deps p ; raw = raw }
+    p′ = record p { deps = msgid ∷ (Process.deps p) ; msgCt = (Process.msgCt p) ℕ.+ 1}
+handleInput src p deliver = case processDq (Process.dq p) of λ
+  { (dq′ , just  record { id = id ; raw = raw ; deps = deps }) → record p { deps = id ∷ deps ++ Process.deps p } , deliver raw , []
+  ; (_   , nothing)                                            → p , null , []
+  }
+  where
+    processDq : List Msg → List Msg × Maybe Msg
+    processDq []       = [] , nothing
+    processDq (x ∷ xs) = case deliverable p x of λ where
+      true  → xs , just x
+      false → let xs′ , m = processDq xs
+              in x ∷ xs , m
+
+    dq,m = processDq (Process.dq p)
 
 handleMsg : Node → Process → Packet Node Msg → Process × Output × List (Packet Node Msg)
-handleMsg dst p (_ ⇒ _ ⦂ msg) = p″ , deliver raws , []
+handleMsg dst p (_ ⇒ _ ⦂ msg) = p″ , null , []
   where
-    p′ = record p { dq = msg ∷ Process.dq p }
-    p″,msgs = processDq p′
-    p″ = proj₁ p″,msgs
-    raws = List.map Msg.raw (proj₂ p″,msgs)
+    p″ = record p { dq = msg ∷ Process.dq p }
 
 DependencyChecking : App
 DependencyChecking = record
