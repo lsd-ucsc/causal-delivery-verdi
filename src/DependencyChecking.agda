@@ -57,18 +57,19 @@ handleInput src p (send dst raw) = p′ , deliver raw ,  [ src ⇒ dst ⦂ msg ]
     msg = record { id = msgid ; deps = Process.deps p ; raw = raw }
     p′ = record p { deps = msgid ∷ (Process.deps p) ; msgCt = (Process.msgCt p) ℕ.+ 1}
 handleInput src p deliver = case processDq (Process.dq p) of λ
-  { (dq′ , just  record { id = id ; raw = raw ; deps = deps }) → record p { deps = id ∷ deps ++ Process.deps p } , deliver raw , []
-  ; (_   , nothing)                                            → p , null , []
+  { (dq′ , just  m) → record p { deps = combineDeps m p } , deliver (Msg.raw m) , []
+  ; (_   , nothing) → p , null , []
   }
   where
+    combineDeps : Msg → Process → Deps
+    combineDeps m p = Msg.id m ∷ Msg.deps m ++ Process.deps p
+
     processDq : List Msg → List Msg × Maybe Msg
     processDq []       = [] , nothing
     processDq (x ∷ xs) = case deliverable p x of λ where
       true  → xs , just x
       false → let xs′ , m = processDq xs
               in x ∷ xs , m
-
-    dq,m = processDq (Process.dq p)
 
 handleMsg : Node → Process → Packet Node Msg → Process × Output × List (Packet Node Msg)
 handleMsg dst p (_ ⇒ _ ⦂ msg) = p″ , null , []

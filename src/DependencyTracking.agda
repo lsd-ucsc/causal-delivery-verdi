@@ -45,9 +45,12 @@ handleInput src p (send dst raw) = p′ , deliver raw ,  [ src ⇒ dst ⦂ msg ]
     p′ = record p { deps = msgid ∷ (Process.deps p) ; msgCt = (Process.msgCt p) ℕ.+ 1}
 
 handleMsg : Node → Process → Packet Node Msg → Process × Output × List (Packet Node Msg)
-handleMsg dst p (_ ⇒ _ ⦂ record { id = id ; raw = raw ; deps = deps }) = p′ , deliver raw , []
+handleMsg dst p (_ ⇒ _ ⦂ m) = p′ , deliver (Msg.raw m) , []
   where
-    p′ = record p { deps = id ∷ deps ++ Process.deps p }
+    combineDeps : Msg → Process → Deps
+    combineDeps m p = Msg.id m ∷ Msg.deps m ++ Process.deps p
+
+    p′ = record p { deps = combineDeps m p }
 
 DependencyTracking : App
 DependencyTracking = record
