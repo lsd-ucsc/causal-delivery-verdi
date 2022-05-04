@@ -58,7 +58,7 @@ handleInput src p (send dst raw) = p′ , deliver raw ,  [ src ⇒ dst ⦂ msg ]
     p′ = record p { deps = msgid ∷ (Process.deps p) ; msgCt = (Process.msgCt p) ℕ.+ 1}
 handleInput src p deliver = case processDq (Process.dq p) of λ
   { (dq′ , just  m) → record p { deps = combineDeps m p } , deliver (Msg.raw m) , []
-  ; (_   , nothing)                                            → p , null , []
+  ; (_   , nothing) → p , null , []
   }
   where
     combineDeps : Msg → Process → Deps
