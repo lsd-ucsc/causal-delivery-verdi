@@ -68,8 +68,6 @@ handleInput src p deliver = case processDq (Process.dq p) of λ
       false → let xs′ , m = processDq xs
               in x ∷ xs , m
 
-    dq,m = processDq (Process.dq p)
-
 handleMsg : Node → Process → Packet Node Msg → Process × Output × List (Packet Node Msg)
 handleMsg dst p (_ ⇒ _ ⦂ msg) = p″ , null , []
   where
